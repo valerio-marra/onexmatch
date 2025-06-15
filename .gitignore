@@ -3,3 +3,5 @@ __pycache__/       # Python bytecode cache
 *.egg-info/        # Build metadata created by setuptools
 .DS_Store          # macOS folder metadata file
 .ipynb_checkpoints/# Jupyter notebooks checkpoints
+build/
+dist/
