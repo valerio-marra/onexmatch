@@ -1,0 +1,23 @@
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "onexmatch"
+version = "0.1.0"
+description = "Crossmatching tool for astronomical catalogs"
+authors = [
+    { name="Valerio Marra", email="valerio.marra@me.com" }
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "astropy"
+]
+requires-python = ">=3.7"
+readme = "README.md"
+
+[project.urls]
+Homepage = "https://github.com/valerio-marra/onexmatch"
