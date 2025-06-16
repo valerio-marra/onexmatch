@@ -5,7 +5,7 @@ from astropy.coordinates import SkyCoord
 from astropy import units as u
 import os
 
-def onexmatch(my_labels, your_labels, max_sep_arcsec=1, verbose=True, make_plot=True):
+def onexmatch(my_labels, your_labels, max_sep_arcsec=1, verbose=True, make_plot=True, show_duplicates=True):
     """
     Perform a sky coordinate crossmatch between two catalogs.
 
@@ -25,6 +25,7 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, verbose=True, make_plot=
         max_sep_arcsec (float): Maximum angular separation for a match (arcseconds).
         verbose (bool): Whether to print match statistics and duplicate entries.
         make_plot (bool): Whether to generate and save diagnostic plots.
+        show_duplicates (bool): Whether to display duplicates in the output.
 
     Returns:
         final_df (pd.DataFrame): Table of matched sources, including RA, DEC, ID columns,
@@ -158,20 +159,18 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, verbose=True, make_plot=
         print(f"Number of matches after removing duplicates: {len(df_unique)}")
         print(f"Output file saved to: {output_path}")
         print(f"Median separation: {np.median(final_df['separation_arcsec'].values):.2g} arcsec")
-        print("")
+
+    if len(duplicates_my_survey) > 0 & show_duplicates:
         print(f"Duplicates according to {my_label}:")
         print(duplicates_my_survey.to_string(index=False))
-        # print(final_df.to_string(index=False))
 
-    if len(duplicates_my_survey) > 0 & make_plot:
         # Group by catalog index and get the two smallest separations for each group
         grouped = duplicates_my_survey.groupby(f'{my_label}_idx')['sep'].nsmallest(2).reset_index()
-
         # Only keep groups with at least two matches
         diffs = grouped.groupby(f'{my_label}_idx')['sep'].apply(lambda x: x.iloc[1] - x.iloc[0])
 
         plt.figure(figsize=(7,4))
-        bins = np.linspace(0, 1, 51)
+        bins = np.linspace(0, max_sep_arcsec, 51)
         plt.hist(diffs, bins=bins, color='orange', edgecolor='k',label=f'{len(diffs)} pairs')
         plt.xlabel('Separation difference (second closest - closest)')
         plt.ylabel('Number of main catalog entries')

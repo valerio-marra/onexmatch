@@ -84,7 +84,8 @@ matched_df = onexmatch(
     },
     max_sep_arcsec=1.0,
     verbose=True,
-    make_plot=True
+    make_plot=True,
+    show_duplicates=True
 )
 ```
 
