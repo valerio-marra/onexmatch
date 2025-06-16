@@ -3,7 +3,7 @@
 
 `onexmatch` is a lightweight Python module for crossmatching two astronomical catalogs based on sky coordinates. It is designed for use in cosmological and survey data analysis workflows, such as matching sources between surveys like [J-PAS](https://www.j-pas.org) and [DESI](https://www.desi.lbl.gov).
 
-<img src="example/onexmatch_J-PAS_Binospec_sep_and_skyplot.png" width="900"/>
+<img src="example/onexmatch_J-NEP_Binospec_sep_and_skyplot.png" width="900"/>
 
 ---
 
