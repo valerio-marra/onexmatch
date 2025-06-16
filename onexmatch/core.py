@@ -110,7 +110,7 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, verbose=True, make_plot=
     })
 
     # subset with duplicates according to my_survey
-    duplicates_my_survey = df_dedu[df_dedu.duplicated(subset=f'{my_label}_idx', keep=False)]
+    duplicates_my_survey = df_dedu[df_dedu.duplicated(subset=f'{my_label}_idx', keep=False)].sort_values(by=f'{my_label}_idx')
     # keep only the closest match per my_survey object
     df_unique = df_dedu.sort_values('sep').drop_duplicates(subset=f'{my_label}_idx', keep='first')
 
