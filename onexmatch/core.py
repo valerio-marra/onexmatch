@@ -149,8 +149,12 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, verbose=True, make_plot=
         axes[1].invert_xaxis()
 
         plt.tight_layout()
-        plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.pdf')
-        plt.savefig(plot_path)
+        if len(matched_df) >1e3:
+            plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.png')
+            plt.savefig(plot_path, dpi=400)
+        else:
+            plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.pdf')
+            plt.savefig(plot_path)
         if verbose:
             print("")
             print(f"Plot saved to: {plot_path}")

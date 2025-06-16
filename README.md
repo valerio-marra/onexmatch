@@ -50,7 +50,7 @@ However, the same **catalog** object may be matched to multiple **source** objec
 In such cases, `onexmatch` retains only the closest **source** match for each **catalog** object.
 
 
-Here's a basic usage example using synthetic data. A full example is available in `example.ipynb`.
+Here's a basic usage example using synthetic data. A full example is available in `example/example.ipynb`.
 
 ```python
 from onexmatch import onexmatch
