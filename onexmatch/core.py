@@ -11,36 +11,54 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, verbose=True, make_plot=
 
     Parameters:
         my_labels (dict): Dictionary with keys:
-            'file' (str): Path to the first catalog
-            'label' (str): Short name for the survey (used in column renaming)
-            'id' (str): Name of the unique ID column
-            'ra' (str): Name of the Right Ascension column (degrees)
-            'dec' (str): Name of the Declination column (degrees)
-        
+            'file' (str, optional): Path to the first catalog CSV file.
+            'df' (pd.DataFrame, optional): DataFrame containing the first catalog.
+            'label' (str): Short name for the survey (used in column renaming).
+            'id' (str): Name of the unique ID column.
+            'ra' (str): Name of the Right Ascension column (in degrees).
+            'dec' (str): Name of the Declination column (in degrees).
+            One of 'file' or 'df' must be provided.
+
         your_labels (dict): Same structure as my_labels, for the second catalog.
-            If both catalogs use the same ID column name, the IDs will be renamed
-            to 'ID_{label}' to avoid column name collision.
 
         max_sep_arcsec (float): Maximum angular separation for a match (arcseconds).
         verbose (bool): Whether to print match statistics and duplicate entries.
         make_plot (bool): Whether to generate and save diagnostic plots.
 
     Returns:
-        matched_df (pd.DataFrame): Table of matched sources, including renamed RA, DEC, ID columns
-                                   and a separation column in arcseconds.
+        matched_df (pd.DataFrame): Table of matched sources, including renamed RA, DEC, ID columns,
+                                   and a separation column in arcseconds. Output is saved as CSV in
+                                   the same directory as 'file', or in the current working directory
+                                   if DataFrames are used as input.
     """
 
-    # `my_survey` is my survey
-    # `your_survey` is the survey that i want to crossmatch to to get eg the labels for `my_survey`
-    my_survey_file, my_label, my_id, my_ra, my_dec = (
-        my_labels['file'], my_labels['label'], my_labels['id'], my_labels['ra'], my_labels['dec']
+    # `my_survey` with `my_labels` is the **catalog** you are working on.
+    # `your_survey` with `your_labels` is the **source** you want to crossmatch against, typically to retrieve additional properties for `my_survey` entries, such as spectroscopic redshifts or classifications.
+
+    my_label, my_id, my_ra, my_dec = (
+        my_labels['label'], my_labels['id'], my_labels['ra'], my_labels['dec']
     )
-    your_survey_file, your_label, your_id, your_ra, your_dec = (
-        your_labels['file'], your_labels['label'], your_labels['id'], your_labels['ra'], your_labels['dec']
+    your_label, your_id, your_ra, your_dec = (
+        your_labels['label'], your_labels['id'], your_labels['ra'], your_labels['dec']
     )
 
-    my_df = pd.read_csv(my_survey_file)
-    your_df = pd.read_csv(your_survey_file)
+    if 'df' in my_labels:
+        my_df = my_labels['df']
+        my_survey_file = None
+    elif 'file' in my_labels:
+        my_survey_file = my_labels['file']
+        my_df = pd.read_csv(my_survey_file)
+    else:
+        raise ValueError("my_labels must contain either 'file' or 'df'.")
+
+    if 'df' in your_labels:
+        your_df = your_labels['df']
+        your_survey_file = None
+    elif 'file' in your_labels:
+        your_survey_file = your_labels['file']
+        your_df = pd.read_csv(your_survey_file)
+    else:
+        raise ValueError("your_labels must contain either 'file' or 'df'.")
 
     for col in [my_ra, my_dec, my_id]:
         if col not in my_df.columns:
@@ -109,7 +127,10 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, verbose=True, make_plot=
     # Concatenate your_survey, my_survey, and separation
     matched_df = pd.concat([your_matched, my_matched, separation.rename('separation_arcsec')], axis=1)
 
-    output_dir = os.path.dirname(os.path.abspath(my_survey_file))
+    if my_survey_file is not None:
+        output_dir = os.path.dirname(os.path.abspath(my_survey_file))
+    else:
+        output_dir = os.getcwd()
     output_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}.csv')
     matched_df.to_csv(output_path, index=False)
 

@@ -57,7 +57,10 @@ from onexmatch import onexmatch
 
 matched_df = onexmatch(
     my_labels={
+        # Provide either a file path:
         'file': 'cats/J-PAS_synthetic.csv',
+        # or directly a pandas DataFrame:
+        # 'df': my_df,
         'label': 'J-PAS',
         'id': 'TILE-NUMBER',
         'ra': 'RA',
@@ -65,6 +68,7 @@ matched_df = onexmatch(
     },
     your_labels={
         'file': 'cats/DESI_synthetic.csv',
+        # 'df': your_df,
         'label': 'DESI',
         'id': 'TILE-ID',
         'ra': 'RA',
@@ -80,9 +84,10 @@ This will:
 
 - Match all sources in `your_labels` against `my_labels` within 1.0 arcseconds
 - Save a CSV file: `onexmatch_J-PAS_DESI.csv`
-- Generate a plot file: `onexmatch_J-PAS_DESI_sep_and_skyplot.pdf`
+- Generate a plot file: `onexmatch_J-PAS_DESI_sep_and_skyplot.pdf` or `.png` (depending on the size of the xmatch)
 
-Both outputs are saved in the same directory as `my_labels['file']`.
+If file paths are used, outputs are saved in the same directory as `my_labels['file']`.  
+If DataFrames are used, outputs are saved in the current working directory.
 
 ---
 
