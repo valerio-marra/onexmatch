@@ -206,7 +206,10 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         diffs_ambig = compute_diffs(ambig)
         diffs_nonambig = compute_diffs(nonambig)
 
-        plt.figure(figsize=(7, 4))
+        plt.rcParams.update({'font.size': 12})
+        plt.rcParams['pdf.fonttype'] = 42  # For editable text in PDFs
+        plt.rcParams['pdf.use14corefonts'] = True
+        plt.figure(figsize=(6, 3))
         bins = np.linspace(0, max_sep_arcsec, 51)
 
         if len(diffs_ambig) > 0:
