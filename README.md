@@ -56,9 +56,8 @@ It is possible for multiple **source** objects to be matched to the same **catal
 By default, `onexmatch` resolves such duplicates by retaining only the closest source match for each catalog object.
 
 
-However, if the two closest source objects are nearly equidistant from the same catalog object, this selection may not be reliable.  
-To address this, the `ambiguity_arcsec` parameter can be set. When enabled, `onexmatch` detects and removes ambiguous matches according to:  
-`second_closest_sep - first_closest_sep < ambiguity_arcsec`  
+However, if the two closest source objects are nearly equidistant from the same catalog object, this selection may not be reliable. 
+To address this, the `ambiguity_arcsec` parameter can be set. When enabled, `onexmatch` detects and removes ambiguous matches according to: `second_closest_sep - first_closest_sep < ambiguity_arcsec`.  
 This criterion ensures that matches are discarded if the separation difference between the two closest sources is smaller than `ambiguity_arcsec`, which should be chosen based on the typical PSF of `my_survey` or `your_survey`.
 
 
