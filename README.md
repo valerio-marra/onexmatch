@@ -3,7 +3,9 @@
 
 `onexmatch` is a lightweight Python module for crossmatching two astronomical catalogs based on sky coordinates. It is designed for use in cosmological and survey data analysis workflows, such as matching sources between surveys like [J-PAS](https://www.j-pas.org) and [DESI](https://www.desi.lbl.gov).
 
-<img src="example/onexmatch_J-NEP_Binospec_sep_and_skyplot.png" width="900"/>
+Valerio, 17/06/2025
+
+<img src="example/onexmatch_J-NEP_MoonObs_sep_and_skyplot.pdf" width="1000"/>
 
 ---
 
@@ -11,7 +13,8 @@
 
 - Angular crossmatching using `astropy.coordinates.SkyCoord`
 - Match filtering by maximum angular separation
-- Duplicate resolution by selecting the nearest match
+- Optional ambiguity threshold to flag and remove ambiguous matches
+- One-to-one matching: duplicate resolution by keeping the nearest source (symmetric match)
 - Customizable input columns (RA, DEC, ID)
 - Outputs matched catalog in CSV format
 - Generates diagnostic plots (histogram of separations, sky map)
@@ -48,12 +51,20 @@ pip install numpy pandas matplotlib astropy
 `my_survey` with `my_labels` is the **catalog** you are working on.
 `your_survey` with `your_labels` is the **source** you want to crossmatch against, typically to retrieve additional properties for `my_survey` entries, such as spectroscopic redshifts or classifications.
 For each object in the **source**, the closest object in the **catalog** is identified based on sky coordinates.
-However, the same **catalog** object may be matched to multiple **source** objects.
-In such cases, `onexmatch` retains only the closest **source** match for each **catalog** object.
+
+It is possible for multiple **source** objects to be matched to the same **catalog** object. 
+By default, `onexmatch` resolves such duplicates by retaining only the closest source match for each catalog object.
 
 
-If `extra_columns` is specified in `my_labels` and/or `your_labels`, the listed columns will be included in the output.  
-Columns from `your_labels` are always renamed with the suffix `_{your_label}` to avoid conflicts.  
+However, if the two closest source objects are nearly equidistant from the same catalog object, this selection may not be reliable.  
+To address this, the `ambiguity_arcsec` parameter can be set. When enabled, `onexmatch` detects and removes ambiguous matches according to:  
+`second_closest_sep - first_closest_sep < ambiguity_arcsec`  
+This criterion ensures that matches are discarded if the separation difference between the two closest sources is smaller than `ambiguity_arcsec`, which should be chosen based on the typical PSF of `my_survey` or `your_survey`.
+
+
+
+If `extra_columns` is specified in `my_labels` and/or `your_labels`, the listed columns will be included in the output. 
+Columns from `your_labels` are always renamed with the suffix `_{your_label}` to avoid conflicts. 
 Columns from `my_labels` are included as-is, without renaming.
 
 Here's a basic usage example using synthetic data. Full example in `example/example.ipynb`.
@@ -63,37 +74,41 @@ from onexmatch import onexmatch
 
 matched_df = onexmatch(
     my_labels={
-        # Provide either a file path:
-        'file': 'cats/J-PAS_synthetic.csv',
+        'file': 'jnep.csv',
         # or directly a pandas DataFrame:
         # 'df': my_df,
-        'label': 'J-PAS',
-        'id': ['TILE-NUMBER', 'SOURCE-ID'],
+        'label': 'J-NEP',
+        'id': ['TILE_ID', 'NUMBER'],
         'ra': 'RA',
         'dec': 'DEC',
-        'extra_columns': ['z_phot']
+        'extra_columns': ['MAG_AUTO_56', 'sglc_prob_star']
     },
     your_labels={
-        'file': 'cats/DESI_synthetic.csv',
+        'file': 'MoonObs.csv',
         # 'df': your_df,
-        'label': 'DESI',
-        'id': 'TILE-ID',
+        'label': 'MoonObs',
+        'id': 'OBJID',
         'ra': 'RA',
         'dec': 'DEC',
-        'extra_columns': ['z_spec', 'CLASS']
+        'extra_columns': ['Z']
     },
     max_sep_arcsec=1.0,
+    ambiguity_arcsec=0.3,
     verbose=True,
     make_plot=True,
-    show_duplicates=True
+    show_duplicates=True,
+    draw_lines=False
 )
 ```
 
 This will:
 
 - Match all sources in `your_labels` against `my_labels` within 1.0 arcseconds
-- Save a CSV file: `onexmatch_J-PAS_DESI.csv`
-- Generate a plot file: `onexmatch_J-PAS_DESI_sep_and_skyplot.pdf` or `.png` (depending on the size of the xmatch)
+- Remove ambiguous matches with a scale < 0.3 arcsec
+- Save a CSV file: `onexmatch_J-NEP_MoonObs.csv`
+- Generate plot files:
+  - `onexmatch_J-NEP_MoonObs_duplicates.pdf`
+  - `onexmatch_J-NEP_MoonObs_sep_and_skyplot.pdf` (or `.png` depending on the size)
 
 If file paths are used, outputs are saved in the same directory as `my_labels['file']`.  
 If DataFrames are used, outputs are saved in the current working directory.
@@ -104,10 +119,8 @@ If DataFrames are used, outputs are saved in the current working directory.
 
 The resulting DataFrame and CSV include:
 
-- ID columns from the main catalog are kept unchanged
-- RA and DEC columns from the main catalog are left unchanged
-- ID columns from the source catalog are renamed to `{ID}_{label}`
-- RA and DEC columns from the source catalog, renamed as `RA_{label}` and `DEC_{label}`
+- ID, RA and DEC columns from the main catalog are kept unchanged
+- ID, RA and DEC columns from the source catalog are renamed with the suffix `_{label}`
 - Any extra columns listed in `extra_columns` are included in the output as-is
 - `separation_arcsec`: the angular separation between matched pairs
 
