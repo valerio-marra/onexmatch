@@ -107,7 +107,7 @@ This will:
 - Save a CSV file: `onexmatch_J-NEP_MoonObs.csv`
 - Generate plot files:
   - `onexmatch_J-NEP_MoonObs_duplicates.pdf`
-  - `onexmatch_J-NEP_MoonObs_sep_and_skyplot.pdf` (or `.png` depending on the size)
+  - `onexmatch_J-NEP_MoonObs_sep_and_skyplot.png` (and `.pdf` depending on the size)
 
 If file paths are used, outputs are saved in the same directory as `my_labels['file']`.  
 If DataFrames are used, outputs are saved in the current working directory.

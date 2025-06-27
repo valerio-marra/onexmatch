@@ -297,10 +297,12 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         plt.tight_layout()
         if len(final_df) > 1e5:
             plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.png')
-            plt.savefig(plot_path, dpi=300)
+            plt.savefig(plot_path, dpi=200)
         else:
             plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.pdf')
             plt.savefig(plot_path)
+            plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.png')
+            plt.savefig(plot_path, dpi=200)
         if verbose:
             print("")
             print(f"Plot saved to: {plot_path}")
