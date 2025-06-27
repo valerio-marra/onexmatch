@@ -5,7 +5,7 @@
 
 Valerio, 17/06/2025
 
-<img src="example/onexmatch_J-NEP_MoonObs_sep_and_skyplot.png" width="1000"/>
+<img src="example/output.png" width="1000"/>
 
 ---
 
