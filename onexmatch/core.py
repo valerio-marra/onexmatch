@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 import os
+import cartopy.crs as ccrs
+import matplotlib.ticker as ticker
+import matplotlib.patches as patches
+import matplotlib.gridspec as gridspec
 
 def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, verbose=True, make_plot=True, show_duplicates=True, draw_lines=False):
     """
@@ -186,7 +190,10 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
             print(f"Number of matches after filtering ambiguous matches: {len(df_dedu)}")
         print(f"Number of matches after removing duplicates: {len(df_unique)}")
         print(f"Output file saved to: {output_path}")
-        print(f"Median separation: {np.median(final_df['separation_arcsec'].values):.2g} arcsec")
+        median_xm = np.median(final_df['separation_arcsec'].values)
+        print(f"Median separation: {median_xm:.2g} arcsec")
+        percentile_95 = np.percentile(final_df['separation_arcsec'].values, 95)
+        print(f"95th percentile: {percentile_95:.2g} arcsec")
 
 
     if len(duplicates_my_survey) > 0 and show_duplicates:
@@ -228,71 +235,146 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         plt.show()
 
     if make_plot:
-        plt.rcParams.update({'font.size': 14})
-        plt.rcParams['pdf.fonttype'] = 42  # For editable text in PDFs
-        plt.rcParams['pdf.use14corefonts'] = True
-        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-        tabplot_galaxies = final_df['separation_arcsec'].values
-        axes[0].set_title(f"Median separation: {np.median(tabplot_galaxies):.2g} arcsec — Total matches: {len(tabplot_galaxies)}")
-        filtered_plot = d2d[d2d < max_sep * 3].arcsec
-        bins = np.logspace(np.log10(filtered_plot.min()), np.log10(filtered_plot.max()), 100)
-        axes[0].hist(filtered_plot, bins=bins, log=True)
-        axes[0].set_ylabel('Counts')
-        axes[0].set_xlabel('Distance (arcsec)')
-        axes[0].axvline(max_sep.value, color='red', linestyle='dashed', label=f'Max sep: {max_sep.value:.2g} arcsec')
-        axes[0].legend()
-        axes[0].set_xscale('log')
-
-        # Plot matched sources and lines between them
-        scatter_kwargs = dict(linewidths=0, marker='o')
-        axes[1].grid(True)
-        
-        axes[1].scatter(final_df[my_ra], final_df[my_dec], label=f'{my_label} (matched)',
-                        s=8, alpha=1, facecolors='blue', edgecolors='red', zorder=3, **scatter_kwargs)
-
-        axes[1].scatter(final_df[f'RA_{your_label}'], final_df[f'DEC_{your_label}'], label=f'{your_label} (matched)',
-                        s=5, alpha=1, facecolors='red', edgecolors='blue', zorder=4, **scatter_kwargs)
-
-        # Draw lines between matched pairs
-        if draw_lines:
-            for i in range(len(final_df)):
-                ra1, dec1 = final_df[my_ra].iloc[i], final_df[my_dec].iloc[i]
-                ra2, dec2 = final_df[f'RA_{your_label}'].iloc[i], final_df[f'DEC_{your_label}'].iloc[i]
-                axes[1].plot([ra1, ra2], [dec1, dec2], 'k-', lw=0.1, zorder=5)
-
-        # Plot unmatched sources from my_df
+        # unmatched sources from my_df
         matched_my_indices = final_df[my_ids[0]] if len(my_ids) == 1 else final_df[my_ids].apply(tuple, axis=1)
         if len(my_ids) == 1:
             unmatched_my = my_df[~my_df[my_ids[0]].isin(matched_my_indices)]
         else:
             unmatched_my = my_df[~my_df[my_ids].apply(tuple, axis=1).isin(matched_my_indices)]
-        axes[1].scatter(unmatched_my[my_ra], unmatched_my[my_dec], label=f'{my_label} (unmatched)',
-                        s=1, alpha=0.6, facecolors='blue', edgecolors='red', zorder=1, **scatter_kwargs)
 
-        # Plot unmatched sources from your_df
+        # unmatched sources from your_df
         matched_your_indices = final_df[your_id_new[0]] if len(your_id_new) == 1 else final_df[your_id_new].apply(tuple, axis=1)
         if len(your_id_new) == 1:
             unmatched_your = your_df[~your_df[your_ids[0]].isin(matched_your_indices)]
         else:
             unmatched_your = your_df[~your_df[your_ids].apply(tuple, axis=1).isin(matched_your_indices)]
-        axes[1].scatter(unmatched_your[your_ra], unmatched_your[your_dec], label=f'{your_label} (unmatched)',
-                        s=1, alpha=0.6, facecolors='red', edgecolors='blue', zorder=2, **scatter_kwargs)
 
-        # Final plot settings
-        axes[1].set_xlabel('RA [deg]')
-        axes[1].set_ylabel('Dec [deg]')
-        axes[1].legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=2, frameon=False)
+        plt.rcParams.update({'font.size': 12})
+        plt.rcParams['pdf.fonttype'] = 42  # For editable text in PDFs
+        plt.rcParams['pdf.use14corefonts'] = True
+ 
+        fig = plt.figure(figsize=(14, 5))
+        gs = gridspec.GridSpec(1, 3, wspace=0.3) # width_ratios=[1, 1.5, 1.5]
+        axes = [None, None, None]
 
-        # Compute RA and Dec limits from both catalogs
-        ra_min = max(my_df[my_ra].min(), your_df[your_ra].min())
-        ra_max = min(my_df[my_ra].max(), your_df[your_ra].max())
-        dec_min = max(my_df[my_dec].min(), your_df[your_dec].min())
-        dec_max = min(my_df[my_dec].max(), your_df[your_dec].max())
+        axes[0] = fig.add_subplot(gs[0])
+        axes[0].set_title(f"Median: {median_xm:.2g} arcsec\n95th perc: {percentile_95:.2g} arcsec", fontsize=12)
+        filtered_plot = d2d[d2d < max_sep * 3].arcsec
+        bins = np.logspace(np.log10(filtered_plot.min()), np.log10(filtered_plot.max()), 100)
+        axes[0].hist(filtered_plot, bins=bins, log=True, label=f"Matches: {len(final_df)}")
+        axes[0].set_ylabel('Counts', labelpad=-2, fontsize=12)
+        axes[0].set_xlabel('Distance (arcsec)', fontsize=12)
+        axes[0].axvline(max_sep.value, color='red', linestyle='dashed', label=f'Max sep: {max_sep.value:.2g}"')
+        axes[0].legend(fontsize=10)
+        axes[0].set_xscale('log')
+        axes[0].set_xlim(2*1e-3, max_sep_arcsec * 2.5)
+        # axes[0].set_ylim(1, axes[0].get_ylim()[1])
+        axes[0].tick_params(labelsize=10)
+        axes[0].set_aspect(1.0 / axes[0].get_data_ratio(), adjustable='box')
 
-        # Apply limits to the plot (RA reversed)
-        axes[1].set_xlim(ra_max, ra_min)
-        axes[1].set_ylim(dec_min, dec_max)
+        # Compute the average Dec in radians for tangent-plane projections (gnomonic projection)
+        dec_avg_rad = np.deg2rad(final_df[my_dec])
+        # Correct ΔRA for declination
+        delta_ra = (final_df[f'RA_{your_label}'] - final_df[my_ra]) * np.cos(dec_avg_rad) * 3600  # arcsec
+        delta_dec = (final_df[f'DEC_{your_label}'] - final_df[my_dec]) * 3600  # arcsec
+
+        axes[1] = fig.add_subplot(gs[1])
+        axes[1].hist2d(delta_ra, delta_dec, bins=60, cmap='viridis', norm='log')
+        axes[1].set_xlabel(r'$\Delta$RA (arcsec)',fontsize=12)
+        axes[1].set_ylabel(r'$\Delta$Dec (arcsec)', labelpad=-2, fontsize=12)
+        axes[1].set_aspect('equal', adjustable='box')
+        axes[1].axhline(0, color='red', linestyle='--', linewidth=1)
+        axes[1].axvline(0, color='red', linestyle='--', linewidth=1)
+        axes[1].set_title(f"Median ΔRA: {np.median(delta_ra):.2g} arcsec\nMedian ΔDec: {np.median(delta_dec):.2g} arcsec", fontsize=12)
+        axes[1].tick_params(labelsize=10)
+        circle = patches.Circle((0, 0), max_sep_arcsec, edgecolor='blue', facecolor='none', linestyle='--', linewidth=2)
+        axes[1].add_patch(circle)
+        axes[1].set_xlim(-max_sep_arcsec*1.01, max_sep_arcsec*1.01)
+        axes[1].set_ylim(-max_sep_arcsec*1.01, max_sep_arcsec*1.01)
+
+        # --- Coordinate conversion functions ---
+        def convert_ra_to_long(ravals):
+            """Convert RA [0, 360] to longitude [-180, 180], with flipped sign"""
+            longvals = np.atleast_1d(ravals).copy()
+            longvals[longvals > 180] -= 360
+            return -longvals
+
+        def convert_long_to_ra(longvals):
+            """Convert longitude [-180, 180] to RA [0, 360], with flipped sign"""
+            ravals = np.atleast_1d(-longvals).copy()
+            ravals[ravals < 0] += 360
+            return ravals
+
+        central_ra = np.median(final_df[my_ra].values)
+        central_dec = np.median(final_df[my_dec].values)
+        ra_min, ra_max = final_df[my_ra].values.min(), final_df[my_ra].values.max()
+        dec_min, dec_max = final_df[my_dec].values.min(), final_df[my_dec].values.max()
+        delta_ra = ra_max - ra_min
+        delta_dec = dec_max - dec_min
+        ra_min -= 0.05 * delta_ra*np.cos(np.deg2rad(central_dec))
+        ra_max += 0.05 * delta_ra*np.cos(np.deg2rad(central_dec))
+        dec_min -= 0.05 * delta_dec
+        dec_max += 0.05 * delta_dec
+
+        axes[2] = fig.add_subplot(gs[2], projection=ccrs.Gnomonic(central_longitude=convert_ra_to_long(central_ra)[0], central_latitude=central_dec))
+        axes[2].set_extent([convert_ra_to_long(ra_min), convert_ra_to_long(ra_max), dec_min, dec_max],crs=ccrs.PlateCarree())
+        gl = axes[2].gridlines(
+            draw_labels=True,
+            xformatter=ticker.FuncFormatter(lambda x, pos: f"{convert_long_to_ra(x)[0]:.1f}"),
+            yformatter=ticker.StrMethodFormatter("{x:.1f}"),
+            x_inline=False,
+            y_inline=False
+        )
+        gl.top_labels = False
+        gl.right_labels = False
+        gl.bottom_labels = True
+        gl.left_labels = True
+        gl.xlabel_style = {'rotation': 0, 'va': 'top', 'fontsize': 10}
+        gl.ylabel_style = {'rotation': 0, 'ha': 'right', 'fontsize': 10}
+
+        # --- Plotting ---
+        axes[2].scatter(convert_ra_to_long(final_df[my_ra]), final_df[my_dec],
+                        transform=ccrs.PlateCarree(), zorder=4,
+                        s=3, alpha=1, facecolors='blue', edgecolors='red', linewidths=0, marker='o') # label=f'{my_label} (matched)',
+
+        axes[2].scatter(convert_ra_to_long(final_df[f'RA_{your_label}']), final_df[f'DEC_{your_label}'],
+                        transform=ccrs.PlateCarree(), zorder=5,
+                        s=1, alpha=1, facecolors='red', edgecolors='blue', linewidths=0, marker='o') #label=f'{your_label} (matched)',
+
+        axes[2].scatter(convert_ra_to_long(unmatched_my[my_ra]), unmatched_my[my_dec],
+                        transform=ccrs.PlateCarree(), label=f'{my_label}', zorder=2,
+                        s=0.5, alpha=0.6, facecolors='blue', edgecolors='red', linewidths=0, marker='o')
+
+        axes[2].scatter(convert_ra_to_long(unmatched_your[your_ra]), unmatched_your[your_dec],
+                        transform=ccrs.PlateCarree(), label=f'{your_label}', zorder=3,
+                        s=0.5, alpha=0.6, facecolors='red', edgecolors='blue', linewidths=0, marker='o')
+
+        if draw_lines:
+            for i in range(len(final_df)):
+                ra1 = convert_ra_to_long(final_df[my_ra].iloc[i])
+                ra2 = convert_ra_to_long(final_df[f'RA_{your_label}'].iloc[i])
+                dec1 = final_df[my_dec].iloc[i]
+                dec2 = final_df[f'DEC_{your_label}'].iloc[i]
+                axes[2].plot([ra1, ra2], [dec1, dec2], 'k-', lw=0.1, zorder=6, transform=ccrs.PlateCarree())
+
+
+        axes[2].legend(
+            loc='upper center',
+            bbox_to_anchor=(0.5, 1.12),
+            ncol=2,
+            frameon=False,
+            handlelength=2.5,
+            markerscale=10,
+            handletextpad=0.5,
+            columnspacing=1.0,
+            fontsize=12
+        )
+        axes[2].text(0.5, -0.07, "RA [deg]", transform=axes[2].transAxes,
+                    ha='center', va='top', fontsize=12)
+        axes[2].text(-0.135, 0.5, "DEC [deg]", transform=axes[2].transAxes,
+                    ha='right', va='center', rotation='vertical',
+                    fontsize=12)
 
         plt.tight_layout()
         if len(final_df) > 1e5:

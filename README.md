@@ -3,7 +3,7 @@
 
 `onexmatch` is a lightweight Python module for crossmatching two astronomical catalogs based on sky coordinates. It is designed for use in cosmological and survey data analysis workflows, such as matching sources between surveys like [J-PAS](https://www.j-pas.org) and [DESI](https://www.desi.lbl.gov).
 
-Valerio, 17/06/2025
+Valerio, 29/06/2025
 
 <img src="example/output.png" width="1000"/>
 
@@ -17,7 +17,7 @@ Valerio, 17/06/2025
 - One-to-one matching: duplicate resolution by keeping the nearest source (symmetric match)
 - Customizable input columns (RA, DEC, ID)
 - Outputs matched catalog in CSV format
-- Generates diagnostic plots (histogram of separations, sky map)
+- Generates diagnostic plots (histograms of separations, sky map)
 
 ---
 
@@ -36,11 +36,12 @@ pip install .
 - pandas
 - matplotlib
 - astropy
+- cartopy
 
 Install them with:
 
 ```bash
-pip install numpy pandas matplotlib astropy
+pip install pandas numpy matplotlib astropy cartopy
 ```
 
 ---
@@ -92,7 +93,7 @@ matched_df = onexmatch(
         'extra_columns': ['Z']
     },
     max_sep_arcsec=1.0,
-    ambiguity_arcsec=0.3,
+    ambiguity_arcsec=0.5,
     verbose=True,
     make_plot=True,
     show_duplicates=True,
@@ -103,7 +104,7 @@ matched_df = onexmatch(
 This will:
 
 - Match all sources in `your_labels` against `my_labels` within 1.0 arcseconds
-- Remove ambiguous matches with a scale < 0.3 arcsec
+- Remove ambiguous matches with a scale < 0.5 arcsec
 - Save a CSV file: `onexmatch_J-NEP_MoonObs.csv`
 - Generate plot files:
   - `onexmatch_J-NEP_MoonObs_duplicates.pdf`
