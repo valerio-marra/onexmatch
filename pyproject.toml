@@ -14,7 +14,8 @@ dependencies = [
     "numpy",
     "pandas",
     "matplotlib",
-    "astropy"
+    "astropy",
+    "cartopy"
 ]
 requires-python = ">=3.7"
 readme = "README.md"

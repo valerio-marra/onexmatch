@@ -9,6 +9,7 @@ setup(
         'pandas',
         'matplotlib',
         'astropy',
+        'cartopy'
     ],
     author='Valerio Marra',
     author_email='valerio.marra@me.com',
