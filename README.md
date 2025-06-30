@@ -3,9 +3,15 @@
 
 `onexmatch` is a lightweight Python module for crossmatching two astronomical catalogs based on sky coordinates. It is designed for use in cosmological and survey data analysis workflows, such as matching sources between surveys like [J-PAS](https://www.j-pas.org) and [DESI](https://www.desi.lbl.gov).
 
-Valerio, 29/06/2025
+Valerio, 30/06/2025
 
-<img src="example/output.png" width="1000"/>
+<img src="example/output.png" width="1100"/>
+
+The 2D histogram above displays the distribution of positional offsets in RA (corrected by cos DEC) and DEC. 
+The KL divergence is computed with respect to a zero-mean isotropic 2D Gaussian having a standard deviation equal to the average of the measured sigmaRA and sigmaDEC. 
+The histogram below shows the distribution of separations, including the applied matching threshold and the region affected by duplicate associations.
+
+<img src="example/output2.png" width="450"/>
 
 ---
 
@@ -31,17 +37,11 @@ cd onexmatch
 pip install .
 ```
 
-**Dependencies**:
-- numpy
-- pandas
-- matplotlib
-- astropy
-- cartopy
 
-Install them with:
+Install the dependencies with:
 
 ```bash
-pip install pandas numpy matplotlib astropy cartopy
+pip install pandas numpy matplotlib astropy cartopy scipy
 ```
 
 ---
@@ -112,6 +112,7 @@ This will:
 
 If file paths are used, outputs are saved in the same directory as `my_labels['file']`.  
 If DataFrames are used, outputs are saved in the current working directory.
+
 
 ---
 

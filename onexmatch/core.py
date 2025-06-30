@@ -8,6 +8,10 @@ import cartopy.crs as ccrs
 import matplotlib.ticker as ticker
 import matplotlib.patches as patches
 import matplotlib.gridspec as gridspec
+import matplotlib.transforms as mtransforms
+from scipy.stats import kstest, chi2
+from scipy.stats import multivariate_normal
+from scipy.stats import gaussian_kde
 
 def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, verbose=True, make_plot=True, show_duplicates=True, draw_lines=False):
     """
@@ -213,21 +217,21 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         diffs_ambig = compute_diffs(ambig)
         diffs_nonambig = compute_diffs(nonambig)
 
-        plt.rcParams.update({'font.size': 12})
+        plt.rcParams.update({'font.size': 10})
         plt.rcParams['pdf.fonttype'] = 42  # For editable text in PDFs
         plt.rcParams['pdf.use14corefonts'] = True
-        plt.figure(figsize=(6, 3))
+        plt.figure(figsize=(6, 2))
         bins = np.linspace(0, max_sep_arcsec, 51)
 
         if len(diffs_ambig) > 0:
-            plt.hist(diffs_ambig, bins=bins, color='red', edgecolor='k', alpha=0.5, label=f'ambiguous ({len(diffs_ambig)})')
+            plt.hist(diffs_ambig, bins=bins, color='red', edgecolor='k', alpha=0.5, label=f'ambiguous ({len(diffs_ambig)} objects)')
 
         if len(diffs_nonambig) > 0:
-            plt.hist(diffs_nonambig, bins=bins, color='blue', edgecolor='k', alpha=0.5, label=f'non-ambiguous ({len(diffs_nonambig)})')
+            plt.hist(diffs_nonambig, bins=bins, color='blue', edgecolor='k', alpha=0.5, label=f'non-ambiguous ({len(diffs_nonambig)} objects)')
 
         plt.xlabel('Separation difference (second closest - closest)')
         if ambiguity_arcsec is not None:
-            plt.axvline(ambiguity_arcsec, color='red', linestyle='dashed', label=f'Ambiguity threshold: {ambiguity_arcsec} arcsec')
+            plt.axvline(ambiguity_arcsec, color='green', linewidth=3, linestyle='dashed', label=f'Ambiguity threshold: {ambiguity_arcsec}"')
         plt.tight_layout()
         plt.legend()
         plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_duplicates.pdf')
@@ -250,16 +254,51 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         else:
             unmatched_your = your_df[~your_df[your_ids].apply(tuple, axis=1).isin(matched_your_indices)]
 
+        # Compute the average Dec in radians for tangent-plane projections (gnomonic projection)
+        dec_avg_rad = np.deg2rad(final_df[my_dec])
+        # Correct ΔRA for declination
+        delta_ra = (final_df[f'RA_{your_label}'] - final_df[my_ra]) * np.cos(dec_avg_rad) * 3600  # arcsec
+        delta_dec = (final_df[f'DEC_{your_label}'] - final_df[my_dec]) * 3600  # arcsec
+        # Compute statistics
+        cov = np.cov(delta_ra, delta_dec)
+        sigma_ra = np.sqrt(cov[0, 0])
+        sigma_dec = np.sqrt(cov[1, 1])
+        corr = cov[0, 1] / (sigma_ra * sigma_dec)
+
+        # Stack the data
+        samples = np.vstack([delta_ra, delta_dec])
+        kde = gaussian_kde(samples)
+        # Reference Gaussian
+        sigma_rv = (sigma_ra+ sigma_dec) / 2
+        rv = multivariate_normal(mean=[0, 0], cov=[[sigma_rv**2, 0], [0, sigma_rv**2]])
+        # Sample grid
+        xmin, xmax = -percentile_95, percentile_95
+        ymin, ymax = -percentile_95, percentile_95
+        X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        # Evaluate densities
+        p = kde(positions)
+        q = rv.pdf(positions.T)
+        # Avoid divide-by-zero or log(0)
+        mask = (p > 0) & (q > 0)
+        kl_divergence = np.sum(p[mask] * np.log(p[mask] / q[mask])) * ((xmax - xmin) * (ymax - ymin)) / len(p)
+        # print(
+        #     f"KL divergence = {kl_divergence:.4f}\n"
+        #     "Comparing the empirical 2D distribution of (ΔRA cos(Dec), ΔDec)\n"
+        #     "to a zero-mean isotropic 2D Gaussian with σ = "
+        #     f"{sigma_rv:.3f}\" in both directions"
+        # )
+
+        # plots begin
         plt.rcParams.update({'font.size': 12})
         plt.rcParams['pdf.fonttype'] = 42  # For editable text in PDFs
         plt.rcParams['pdf.use14corefonts'] = True
- 
         fig = plt.figure(figsize=(14, 5))
-        gs = gridspec.GridSpec(1, 3, wspace=0.3) # width_ratios=[1, 1.5, 1.5]
+        gs = gridspec.GridSpec(1, 3, wspace=0.25) # width_ratios=[1, 1.5, 1.5]
         axes = [None, None, None]
 
         axes[0] = fig.add_subplot(gs[0])
-        axes[0].set_title(f"Median: {median_xm:.2g} arcsec\n95th perc: {percentile_95:.2g} arcsec", fontsize=12)
+        axes[0].set_title(f"Median: {median_xm:.2g}\"  -  95th perc: {percentile_95:.2g}\"", fontsize=12)
         filtered_plot = d2d[d2d < max_sep * 3].arcsec
         bins = np.logspace(np.log10(filtered_plot.min()), np.log10(filtered_plot.max()), 100)
         axes[0].hist(filtered_plot, bins=bins, log=True, label=f"Matches: {len(final_df)}")
@@ -269,15 +308,9 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         axes[0].legend(fontsize=10)
         axes[0].set_xscale('log')
         axes[0].set_xlim(2*1e-3, max_sep_arcsec * 2.5)
-        # axes[0].set_ylim(1, axes[0].get_ylim()[1])
+        # axes[0].set_ylim(1, 500)
         axes[0].tick_params(labelsize=10)
         axes[0].set_aspect(1.0 / axes[0].get_data_ratio(), adjustable='box')
-
-        # Compute the average Dec in radians for tangent-plane projections (gnomonic projection)
-        dec_avg_rad = np.deg2rad(final_df[my_dec])
-        # Correct ΔRA for declination
-        delta_ra = (final_df[f'RA_{your_label}'] - final_df[my_ra]) * np.cos(dec_avg_rad) * 3600  # arcsec
-        delta_dec = (final_df[f'DEC_{your_label}'] - final_df[my_dec]) * 3600  # arcsec
 
         axes[1] = fig.add_subplot(gs[1])
         axes[1].hist2d(delta_ra, delta_dec, bins=60, cmap='viridis', norm='log')
@@ -286,10 +319,24 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         axes[1].set_aspect('equal', adjustable='box')
         axes[1].axhline(0, color='red', linestyle='--', linewidth=1)
         axes[1].axvline(0, color='red', linestyle='--', linewidth=1)
-        axes[1].set_title(f"Median ΔRA: {np.median(delta_ra):.2g} arcsec\nMedian ΔDec: {np.median(delta_dec):.2g} arcsec", fontsize=12)
+        axes[1].set_title(f"KL divergence = {kl_divergence:.3f}", fontsize=12)
         axes[1].tick_params(labelsize=10)
         circle = patches.Circle((0, 0), max_sep_arcsec, edgecolor='blue', facecolor='none', linestyle='--', linewidth=2)
         axes[1].add_patch(circle)
+
+        stats_text = (
+            r'$\sigma_{\mathrm{RA}}$  = ' + f'{sigma_ra:.3f}"' + "    " + r'$\overline{\Delta\mathrm{RA}}$   = ' + f'{np.mean(delta_ra):.3f}"\n'
+            r'$\sigma_{\mathrm{Dec}}$ = ' + f'{sigma_dec:.3f}"' + "    " + r'$\overline{\Delta\mathrm{Dec}}$ = ' + f'{np.mean(delta_dec):.3f}"\n'
+            r'$\rho$  = ' + f'{corr:.3f}'
+        )
+        axes[1].text(
+            0.02, 0.98, stats_text,
+            transform=axes[1].transAxes,
+            ha='left', va='top',
+            fontsize=10,
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.9, edgecolor='none')
+        )
+
         axes[1].set_xlim(-max_sep_arcsec*1.01, max_sep_arcsec*1.01)
         axes[1].set_ylim(-max_sep_arcsec*1.01, max_sep_arcsec*1.01)
 
@@ -316,6 +363,20 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         ra_max += 0.05 * delta_ra*np.cos(np.deg2rad(central_dec))
         dec_min -= 0.05 * delta_dec
         dec_max += 0.05 * delta_dec
+
+        # Compute angular spans (RA already corrected by cos(Dec))
+        ra_span_proj = (ra_max - ra_min) * np.cos(np.deg2rad(central_dec))
+        dec_span = dec_max - dec_min
+
+        # Enforce aspect ratio = 1 by adjusting the smaller span
+        if ra_span_proj > dec_span:
+            delta = (ra_span_proj - dec_span) / 2
+            dec_min -= delta
+            dec_max += delta
+        else:
+            delta = (dec_span - ra_span_proj) / (2 * np.cos(np.deg2rad(central_dec)))
+            ra_min -= delta
+            ra_max += delta
 
         axes[2] = fig.add_subplot(gs[2], projection=ccrs.Gnomonic(central_longitude=convert_ra_to_long(central_ra)[0], central_latitude=central_dec))
         axes[2].set_extent([convert_ra_to_long(ra_min), convert_ra_to_long(ra_max), dec_min, dec_max],crs=ccrs.PlateCarree())
@@ -358,10 +419,14 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
                 dec2 = final_df[f'DEC_{your_label}'].iloc[i]
                 axes[2].plot([ra1, ra2], [dec1, dec2], 'k-', lw=0.1, zorder=6, transform=ccrs.PlateCarree())
 
+        renderer = fig.canvas.get_renderer()
+        bbox = axes[2].get_tightbbox(renderer).transformed(fig.dpi_scale_trans.inverted())
+        aspect_ratio = bbox.width / bbox.height
+        # print(f"Aspect ratio of the sky plot: {aspect_ratio:.4f}")
 
         axes[2].legend(
             loc='upper center',
-            bbox_to_anchor=(0.5, 1.12),
+            bbox_to_anchor=(0.5, 1+(0.085*aspect_ratio/0.9457)),
             ncol=2,
             frameon=False,
             handlelength=2.5,
@@ -370,21 +435,23 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
             columnspacing=1.0,
             fontsize=12
         )
-        axes[2].text(0.5, -0.07, "RA [deg]", transform=axes[2].transAxes,
+        axes[2].text(0.5, 0-0.06*aspect_ratio/0.9457, "RA [deg]", transform=axes[2].transAxes,
                     ha='center', va='top', fontsize=12)
-        axes[2].text(-0.135, 0.5, "DEC [deg]", transform=axes[2].transAxes,
+        axes[2].text(-0.11, 0.45, "DEC [deg]", transform=axes[2].transAxes,
                     ha='right', va='center', rotation='vertical',
                     fontsize=12)
 
-        plt.tight_layout()
+        # plt.tight_layout() # not supported by cartopy
+        fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        fig.canvas.draw()
         if len(final_df) > 1e5:
             plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.png')
-            plt.savefig(plot_path, dpi=200)
+            plt.savefig(plot_path, dpi=200, bbox_inches='tight')
         else:
             plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.pdf')
-            plt.savefig(plot_path)
+            plt.savefig(plot_path, bbox_inches='tight')
             plot_path = os.path.join(output_dir, f'onexmatch_{my_label}_{your_label}_sep_and_skyplot.png')
-            plt.savefig(plot_path, dpi=200)
+            plt.savefig(plot_path, dpi=200, bbox_inches='tight')
         if verbose:
             print("")
             print(f"Plot saved to: {plot_path}")
