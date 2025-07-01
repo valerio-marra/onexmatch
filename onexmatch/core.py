@@ -340,7 +340,7 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         axes[1].set_xlim(-max_sep_arcsec*1.01, max_sep_arcsec*1.01)
         axes[1].set_ylim(-max_sep_arcsec*1.01, max_sep_arcsec*1.01)
         axes[1].text(0.99, 0.99, "Gnomonic projection", transform=axes[1].transAxes,
-             ha='right', va='top', fontsize=9, color='gray')
+             ha='right', va='top', fontsize=9, color='gray', bbox=dict(boxstyle='round,pad=0.1', facecolor='white', alpha=0.8, edgecolor='none'))
 
         # --- Coordinate conversion functions ---
         def convert_ra_to_long(ravals):
