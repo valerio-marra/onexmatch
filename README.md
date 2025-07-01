@@ -8,7 +8,7 @@ Valerio, 30/06/2025
 <img src="example/output.png" width="1100"/>
 
 The 2D histogram above displays the distribution of positional offsets in RA (corrected by cos DEC) and DEC. 
-The KL divergence is computed with respect to a zero-mean isotropic 2D Gaussian having a standard deviation equal to the average of the measured sigmaRA and sigmaDEC. 
+The KL divergence is computed, within a radius defined by the 95th percentile of the separation distribution, with respect to a zero-mean isotropic 2D Gaussian having a standard deviation equal to the average of the measured sigmaRA and sigmaDEC.
 The histogram below shows the distribution of separations, including the applied matching threshold and the region affected by duplicate associations.
 
 <img src="example/output2.png" width="450"/>
