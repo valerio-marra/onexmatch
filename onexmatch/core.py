@@ -195,9 +195,9 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         print(f"Number of matches after removing duplicates: {len(df_unique)}")
         print(f"Output file saved to: {output_path}")
         median_xm = np.median(final_df['separation_arcsec'].values)
-        print(f"Median separation: {median_xm:.2g} arcsec")
+        # print(f"Median separation: {median_xm:.2g} arcsec")
         percentile_95 = np.percentile(final_df['separation_arcsec'].values, 95)
-        print(f"95th percentile: {percentile_95:.2g} arcsec")
+        # print(f"95th percentile: {percentile_95:.2g} arcsec")
 
 
     if len(duplicates_my_survey) > 0 and show_duplicates:
@@ -319,7 +319,7 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         axes[1].set_aspect('equal', adjustable='box')
         axes[1].axhline(0, color='red', linestyle='--', linewidth=1)
         axes[1].axvline(0, color='red', linestyle='--', linewidth=1)
-        axes[1].set_title(f"KL divergence = {kl_divergence:.3f}", fontsize=12)
+        axes[1].set_title(f"Kullback–Leibler divergence = {kl_divergence:.3f}", fontsize=12)
         axes[1].tick_params(labelsize=10)
         circle = patches.Circle((0, 0), max_sep_arcsec, edgecolor='blue', facecolor='none', linestyle='--', linewidth=2)
         axes[1].add_patch(circle)
