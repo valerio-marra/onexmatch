@@ -3,7 +3,7 @@
 
 `onexmatch` is a lightweight Python module for crossmatching two astronomical catalogs based on sky coordinates. It is designed for use in cosmological and survey data analysis workflows, such as matching sources between surveys like [J-PAS](https://www.j-pas.org) and [DESI](https://www.desi.lbl.gov).
 
-Valerio, 30/06/2025
+Valerio, 15/09/2025
 
 <img src="example/output.png" width="1100"/>
 
@@ -87,7 +87,7 @@ matched_df = onexmatch(
         'file': 'MoonObs.csv',
         # 'df': your_df,
         'label': 'MoonObs',
-        'id': 'OBJID',
+        'id': 'OBJID', # optional
         'ra': 'RA',
         'dec': 'DEC',
         'extra_columns': ['Z']
@@ -96,8 +96,7 @@ matched_df = onexmatch(
     ambiguity_arcsec=0.5,
     verbose=True,
     make_plot=True,
-    show_duplicates=True,
-    draw_lines=False
+    show_duplicates=True
 )
 ```
 

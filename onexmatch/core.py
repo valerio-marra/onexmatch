@@ -8,10 +8,9 @@ import cartopy.crs as ccrs
 import matplotlib.ticker as ticker
 import matplotlib.patches as patches
 import matplotlib.gridspec as gridspec
-import matplotlib.transforms as mtransforms
-from scipy.stats import kstest, chi2
 from scipy.stats import multivariate_normal
 from scipy.stats import gaussian_kde
+from matplotlib.colors import LogNorm
 
 def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, verbose=True, make_plot=True, show_duplicates=True, draw_lines=False):
     """
@@ -29,6 +28,8 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
             One of 'file' or 'df' must be provided.
 
         your_labels (dict): Same structure as my_labels, for the second catalog.
+        If your_labels does not provide 'id', no ID columns from that catalog are included in the output;
+        positional indices are used internally only to compute unmatched_your.
 
         max_sep_arcsec (float): Maximum angular separation for a match (arcseconds).
         ambiguity_arcsec (float, optional): If set, ambiguous matches are discarded.
@@ -58,7 +59,11 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
     my_dec = my_labels['dec']
 
     your_label = your_labels['label']
-    your_ids = your_labels['id'] if isinstance(your_labels['id'], list) else [your_labels['id']]
+    your_ids_raw = your_labels.get('id', None)
+    if your_ids_raw is None:
+        your_ids = []  # no ID columns provided
+    else:
+        your_ids = your_ids_raw if isinstance(your_ids_raw, list) else [your_ids_raw]
     your_ra = your_labels['ra']
     your_dec = your_labels['dec']
 
@@ -87,6 +92,10 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
     # to handle possible accidental whitespace in column names from CSVs
     my_df.columns = my_df.columns.str.strip()
     your_df.columns = your_df.columns.str.strip()
+
+    # Ensure positional indices are consistent if we must fall back to them
+    my_df = my_df.reset_index(drop=True)
+    your_df = your_df.reset_index(drop=True)
 
     # Check if required columns are present in both DataFrames
     for col in [my_ra, my_dec] + my_ids:
@@ -154,11 +163,13 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         your_ra: f'RA_{your_label}',
         your_dec: f'DEC_{your_label}'
     }).reset_index(drop=True)
-    
-    # Rename ID columns to indicate origin
-    your_id_new = [f'{col}_{your_label}' for col in your_ids]
-    your_matched = your_matched.rename(columns=dict(zip(your_ids, your_id_new)))
 
+    # Rename ID columns to indicate origin
+    if your_ids:
+        your_id_new = [f'{col}_{your_label}' for col in your_ids]
+        your_matched = your_matched.rename(columns=dict(zip(your_ids, your_id_new)))
+    else:
+        your_id_new = []
     my_matched = my_df.iloc[df_unique[f'{my_label}_idx'].values].reset_index(drop=True)
 
     # Reset index for alignment
@@ -186,6 +197,16 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
     if final_df.empty:
         print("Warning: No matches found.")
 
+
+    if verbose or make_plot:
+        # Compute these unconditionally if plotting may occur
+        if not final_df.empty:
+            median_xm = np.median(final_df['separation_arcsec'].values)
+            percentile_95 = np.percentile(final_df['separation_arcsec'].values, 95)
+        else:
+            median_xm = np.nan
+            percentile_95 = np.nan
+
     if verbose:
         print(f"Number of objects in {my_label}: {len(my_df)}")
         print(f"Number of objects in {your_label}: {len(idx)}")
@@ -194,9 +215,7 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
             print(f"Number of matches after filtering ambiguous matches: {len(df_dedu)}")
         print(f"Number of matches after removing duplicates: {len(df_unique)}")
         print(f"Output file saved to: {output_path}")
-        median_xm = np.median(final_df['separation_arcsec'].values)
         # print(f"Median separation: {median_xm:.2g} arcsec")
-        percentile_95 = np.percentile(final_df['separation_arcsec'].values, 95)
         # print(f"95th percentile: {percentile_95:.2g} arcsec")
 
 
@@ -238,6 +257,11 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         plt.savefig(plot_path)
         plt.show()
 
+    # Early exit: no matches -> skip plots
+    if final_df.empty and make_plot:
+        print("Skipping plots: no matches.")
+        return final_df
+
     if make_plot:
 
         # unmatched sources from my_df
@@ -248,40 +272,58 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
             unmatched_my = my_df[~my_df[my_ids].apply(tuple, axis=1).isin(matched_my_indices)]
 
         # unmatched sources from your_df
-        matched_your_indices = final_df[your_id_new[0]] if len(your_id_new) == 1 else final_df[your_id_new].apply(tuple, axis=1)
-        if len(your_id_new) == 1:
-            unmatched_your = your_df[~your_df[your_ids[0]].isin(matched_your_indices)]
+        if your_ids:
+            matched_your_indices = (final_df[your_id_new[0]] if len(your_id_new)==1 else final_df[your_id_new].apply(tuple, axis=1))
+            if len(your_id_new) == 1:
+                unmatched_your = your_df[~your_df[your_ids[0]].isin(matched_your_indices)]
+            else:
+                unmatched_your = your_df[~your_df[your_ids].apply(tuple, axis=1).isin(matched_your_indices)]
         else:
-            unmatched_your = your_df[~your_df[your_ids].apply(tuple, axis=1).isin(matched_your_indices)]
+            # use positional indices
+            unmatched_your = your_df.drop(index=df_unique[f'{your_label}_idx'].values)
 
         # Compute the average Dec in radians for tangent-plane projections (gnomonic projection)
-        dec_avg_rad = np.deg2rad(final_df[my_dec])
+        dec_rad = np.deg2rad(final_df[my_dec])
         # Correct ΔRA for declination
-        delta_ra = (final_df[f'RA_{your_label}'] - final_df[my_ra]) * np.cos(dec_avg_rad) * 3600  # arcsec
+        delta_ra = (final_df[f'RA_{your_label}'] - final_df[my_ra]) * np.cos(dec_rad) * 3600  # arcsec
         delta_dec = (final_df[f'DEC_{your_label}'] - final_df[my_dec]) * 3600  # arcsec
         # Compute statistics
-        cov = np.cov(delta_ra, delta_dec)
-        sigma_ra = np.sqrt(cov[0, 0])
-        sigma_dec = np.sqrt(cov[1, 1])
-        corr = cov[0, 1] / (sigma_ra * sigma_dec)
+        if len(final_df) > 1:
+            cov = np.cov(delta_ra, delta_dec)
+            sigma_ra = float(np.sqrt(cov[0, 0]))
+            sigma_dec = float(np.sqrt(cov[1, 1]))
+            if sigma_ra > 0 and sigma_dec > 0:
+                corr = cov[0, 1] / (sigma_ra * sigma_dec)
+            else:
+                corr = 0.0
+        else:
+            sigma_ra = sigma_dec = corr = 0.0
 
-        # Stack the data
-        samples = np.vstack([delta_ra, delta_dec])
-        kde = gaussian_kde(samples)
-        # Reference Gaussian
-        sigma_rv = (sigma_ra+ sigma_dec) / 2
-        rv = multivariate_normal(mean=[0, 0], cov=[[sigma_rv**2, 0], [0, sigma_rv**2]])
-        # Sample grid
-        xmin, xmax = -percentile_95, percentile_95
-        ymin, ymax = -percentile_95, percentile_95
-        X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
-        positions = np.vstack([X.ravel(), Y.ravel()])
-        # Evaluate densities
-        p = kde(positions)
-        q = rv.pdf(positions.T)
-        # Avoid divide-by-zero or log(0)
-        mask = (p > 0) & (q > 0)
-        kl_divergence = np.sum(p[mask] * np.log(p[mask] / q[mask])) * ((xmax - xmin) * (ymax - ymin)) / len(p)
+        # Skip KDE / KL if too many points
+        enable_kde = len(final_df) <= 20000
+        if enable_kde:
+            # Stack the data
+            samples = np.vstack([delta_ra, delta_dec])
+            kde = gaussian_kde(samples)
+            # Reference Gaussian
+            sigma_rv = (sigma_ra+ sigma_dec) / 2
+            rv = multivariate_normal(mean=[0, 0], cov=[[sigma_rv**2, 0], [0, sigma_rv**2]])
+            # Sample grid
+            xmin, xmax = -percentile_95, percentile_95
+            ymin, ymax = -percentile_95, percentile_95
+            X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+            positions = np.vstack([X.ravel(), Y.ravel()])
+            # Evaluate densities
+            p = kde(positions)
+            q = rv.pdf(positions.T)
+            # Avoid divide-by-zero or log(0)
+            mask = (p > 0) & (q > 0)
+            kl_divergence = np.sum(p[mask] * np.log(p[mask] / q[mask])) * ((xmax - xmin) * (ymax - ymin)) / len(p)
+        else:
+            kl_divergence = np.nan
+            xmin = xmax = ymin = ymax = percentile_95  # placeholders
+
+
         # print(
         #     f"KL divergence = {kl_divergence:.4f}\n"
         #     "Comparing the empirical 2D distribution of (ΔRA cos(Dec), ΔDec)\n"
@@ -301,7 +343,8 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         axes[0].set_title(f"Median: {median_xm:.2g}\"  -  95th perc: {percentile_95:.2g}\"", fontsize=12)
         filtered_plot = d2d[d2d < max_sep * 3].arcsec
         bins = np.logspace(np.log10(filtered_plot.min()), np.log10(filtered_plot.max()), 100)
-        axes[0].hist(filtered_plot, bins=bins, log=True, label=f"Matches: {len(final_df)}")
+        axes[0].hist(filtered_plot, bins=bins, log=True, color='red', alpha=0.5, label=f"Plotted: {len(filtered_plot)}")
+        axes[0].hist(final_df['separation_arcsec'].values, bins=bins, log=True, label=f"Matches: {len(final_df)}")
         axes[0].set_ylabel('Counts', labelpad=-2, fontsize=12)
         axes[0].set_xlabel('Distance (arcsec)', fontsize=12)
         axes[0].axvline(max_sep.value, color='red', linestyle='dashed', label=f'Max sep: {max_sep.value:.2g}"')
@@ -313,13 +356,17 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         axes[0].set_aspect(1.0 / axes[0].get_data_ratio(), adjustable='box')
 
         axes[1] = fig.add_subplot(gs[1])
-        axes[1].hist2d(delta_ra, delta_dec, bins=60, cmap='viridis', norm='log')
+        axes[1].hist2d(delta_ra, delta_dec, bins=60, cmap='viridis', norm=LogNorm())
         axes[1].set_xlabel(r'$\Delta$RA (arcsec)',fontsize=12)
         axes[1].set_ylabel(r'$\Delta$Dec (arcsec)', labelpad=-2, fontsize=12)
         axes[1].set_aspect('equal', adjustable='box')
         axes[1].axhline(0, color='red', linestyle='--', linewidth=1)
         axes[1].axvline(0, color='red', linestyle='--', linewidth=1)
-        axes[1].set_title(f"Kullback–Leibler divergence = {kl_divergence:.3f}", fontsize=12)
+        axes[1].set_title(
+            "Kullback–Leibler divergence = "
+            + (f"{kl_divergence:.3f}" if not np.isnan(kl_divergence) else "n/a (KDE skipped)"),
+            fontsize=12
+        )
         axes[1].tick_params(labelsize=10)
         circle = patches.Circle((0, 0), max_sep_arcsec, edgecolor='blue', facecolor='none', linestyle='--', linewidth=2)
         axes[1].add_patch(circle)
@@ -359,12 +406,12 @@ def onexmatch(my_labels, your_labels, max_sep_arcsec=1, ambiguity_arcsec=None, v
         central_dec = np.median(final_df[my_dec].values)
         ra_min, ra_max = final_df[my_ra].values.min(), final_df[my_ra].values.max()
         dec_min, dec_max = final_df[my_dec].values.min(), final_df[my_dec].values.max()
-        delta_ra = ra_max - ra_min
-        delta_dec = dec_max - dec_min
-        ra_min -= 0.05 * delta_ra*np.cos(np.deg2rad(central_dec))
-        ra_max += 0.05 * delta_ra*np.cos(np.deg2rad(central_dec))
-        dec_min -= 0.05 * delta_dec
-        dec_max += 0.05 * delta_dec
+        ra_span_raw = ra_max - ra_min
+        dec_span_raw = dec_max - dec_min
+        ra_min -= 0.05 * ra_span_raw * np.cos(np.deg2rad(central_dec))
+        ra_max += 0.05 * ra_span_raw * np.cos(np.deg2rad(central_dec))
+        dec_min -= 0.05 * dec_span_raw
+        dec_max += 0.05 * dec_span_raw
 
         # Compute angular spans (RA already corrected by cos(Dec))
         ra_span_proj = (ra_max - ra_min) * np.cos(np.deg2rad(central_dec))
