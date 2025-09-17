@@ -3,6 +3,7 @@ message: If you use this software, please cite it.
 title: onexmatch
 version: 0.1.0
 date-released: 2025-09-17
+doi: 10.5281/zenodo.17148385
 abstract: Crossmatching tool for astronomical catalogs.
 authors:
   - family-names: Marra
