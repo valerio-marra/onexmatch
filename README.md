@@ -120,7 +120,7 @@ If DataFrames are used, outputs are saved in the current working directory.
 The resulting DataFrame and CSV include:
 
 - ID, RA and DEC columns from the main catalog are kept unchanged
-- ID, RA and DEC columns from the source catalog are renamed with the suffix `_{label}`
+- ID (optional), RA and DEC columns from the source catalog are renamed with the suffix `_{label}`
 - Any extra columns listed in `extra_columns` are included in the output as-is
 - `separation_arcsec`: the angular separation between matched pairs
 
